@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>極速單字挑戰 - 巨型山道 (Enhanced v2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Russo+One&display=swap');
+
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: #0f1012; 
+      color: white;
+      height: 100vh;
+      height: 100dvh; 
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      overscroll-behavior: none;
+    }
+
+    .game-font { font-family: 'Russo One', sans-serif; }
+
+    /* --- 遊戲主框架 --- */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 3fr 1fr;
+      grid-template-rows: 100%;
+      width: 98%; max-width: 1400px;
+      height: 95vh; max-height: 900px;
+      background: #111;
+      border-radius: 4px;
+      box-shadow: 0 0 50px rgba(0,0,0,0.9);
+      overflow: hidden;
+      border: 2px solid #222;
+    }
+
+    @media (max-width: 768px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+        /* 調整比例：遊戲畫面 75%，下方儀表板 25% */
+        grid-template-rows: 75% 25%;      
+        width: 100%;
+        height: 100%;
+        max-height: none;
+        border-radius: 0;
+        border: none;
+      }
+      .track-panel { border-right: none !important; border-bottom: 2px solid #333; }
+      
+      /* 緊湊化儀表板樣式 */
+      .dashboard-panel { 
+        border-left: none !important; 
+        padding: 8px 12px !important; 
+        overflow-y: hidden;
+        justify-content: space-between;
+      }
+      
+      /* 標題欄緊湊化 */
+      .dashboard-panel > div:first-child {
+        margin-bottom: 4px !important;
+        padding-bottom: 4px !important;
+        border-bottom: 1px solid #333;
+      }
+      
+      /* 標題文字縮小並改為單行 */
+      .dashboard-panel h1 { 
+        font-size: 1rem !important; 
+        display: flex; 
+        align-items: center; 
+        gap: 5px;
+      }
+      .dashboard-panel h1 br { display: none; }
+
+      /* 題目區域改為橫向排列 */
+      #questionArea {
+        padding-top: 0 !important;
+        flex-direction: row !important;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+      }
+
+      /* 題目卡片簡化 */
+      .question-card { 
+        padding: 0 !important; 
+        margin-bottom: 0 !important; 
+        background: none !important;
+        box-shadow: none !important;
+        border: none !important;
+        width: auto !important;
+        text-align: left;
+      }
+      .question-card h2 { font-size: 1.4rem !important; }
+
+      /* 回饋訊息移至右側 */
+      #feedback {
+        margin-top: 0 !important;
+        height: auto !important;
+        text-align: right;
+      }
+
+      .controls-hint { display: none !important; }
+      
+      /* Start Screen 適應矮畫面 */
+      #startScreen { padding: 0 20px; }
+      #startScreen .text-6xl { display: none; } /* 隱藏 emoji */
+      #startScreen h2 { font-size: 1.2rem !important; margin-bottom: 5px !important; }
+      #startScreen p { display: none; }
+      #startScreen button { 
+        padding: 6px 0 !important; 
+        font-size: 1rem !important; 
+        height: auto !important;
+      }
+
+      /* Result Screen 適應矮畫面 (新增修正) */
+      #resultScreen { padding: 0 20px; justify-content: center; }
+      #resultScreen .text-6xl { display: none; } /* 隱藏 emoji */
+      #resultScreen h2 { font-size: 1.5rem !important; margin-bottom: 2px !important; }
+      #resultScreen p { font-size: 0.9rem !important; margin-bottom: 8px !important; }
+      #resultScreen button { 
+        padding: 8px 0 !important; 
+        font-size: 1rem !important; 
+        height: auto !important;
+        width: 100%;
+      }
+
+      /* 進度條區域 */
+      .mt-auto { padding-top: 2px !important; }
+    }
+
+    /* --- 賽道場景 --- */
+    .track-panel {
+      position: relative;
+      background: linear-gradient(to bottom, #3b82f6 0%, #93c5fd 60%, #e0f2fe 100%);
+      overflow: hidden;
+      perspective: 800px; 
+      border-right: 4px solid #000;
+      cursor: crosshair; 
+      touch-action: none; 
+      width: 100%;
+      height: 100%;
+    }
+
+    .track-panel::before {
+        content: '';
+        position: absolute;
+        bottom: 40%; left: 0; right: 0; height: 40%;
+        background: linear-gradient(to top, #4b5563, transparent);
+        opacity: 0.5;
+        z-index: 1;
+        clip-path: polygon(0% 100%, 15% 60%, 30% 90%, 50% 50%, 70% 80%, 85% 60%, 100% 100%);
+    }
+
+    .input-layer {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000;
+    }
+
+    .scene-container {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      transform-style: preserve-3d;
+      z-index: 2;
+    }
+
+    .wall {
+      position: absolute;
+      top: -20%;
+      bottom: -20%;
+      width: 40%; 
+      z-index: 10; 
+      background-color: #57534e; 
+      background-image: 
+        linear-gradient(to right, rgba(0,0,0,0.3), transparent, rgba(0,0,0,0.3)),
+        linear-gradient(to bottom, #57534e, #44403c);
+      background-size: 100% 100%;
+      box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
+    }
+
+    .side-left {
+      left: -35%;  
+      transform-origin: left center;
+      transform: skewY(10deg) scaleX(1.2); 
+      clip-path: polygon(0% 0%, 100% 0%, 85% 10%, 95% 20%, 80% 35%, 90% 50%, 82% 65%, 95% 80%, 85% 90%, 100% 100%, 0% 100%);
+      border-right: none; 
+      filter: drop-shadow(10px 0 10px rgba(0,0,0,0.5));
+    }
+
+    .side-right {
+      right: -35%; 
+      transform-origin: right center;
+      transform: skewY(-10deg) scaleX(1.2); 
+      clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 15% 90%, 5% 80%, 18% 65%, 10% 50%, 20% 35%, 5% 20%, 15% 10%);
+      border-left: none;
+      filter: drop-shadow(-10px 0 10px rgba(0,0,0,0.5));
+    }
+
+    .road-container {
+      position: absolute;
+      top: -20%; left: -100%; width: 300%; height: 150%;
+      transform-origin: 50% 100%;
+      transform: rotateX(60deg); 
+      z-index: 5; 
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 25%);
+      mask-image: linear-gradient(to bottom, transparent 0%, black 25%);
+    }
+
+    .road {
+      width: 100%; height: 100%;
+      background-color: #333;
+      background-image: 
+        linear-gradient(to right, transparent 49%, #d97706 49%, #d97706 49.5%, transparent 49.5%, transparent 50.5%, #d97706 50.5%, #d97706 51%, transparent 51%),
+        linear-gradient(to right, rgba(255,255,255,0.8) 18%, transparent 18%, transparent 82%, rgba(255,255,255,0.8) 82%),
+        radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.4) 100%),
+        linear-gradient(to right, #57534e 0%, #57534e 17%, transparent 17%, transparent 83%, #57534e 83%, #57534e 100%);
+      background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+      background-blend-mode: normal, normal, overlay, normal;
+      animation: roadScroll 0.1s linear infinite;
+    }
+
+    @keyframes roadScroll {
+      from { background-position: 0 0, 0 0, 0 0, 0 0; }
+      to { background-position: 0 100px, 0 100px, 0 0, 0 100px; }
+    }
+
+    /* --- 實體系統 --- */
+    .game-object {
+      position: absolute;
+      transform-style: preserve-3d;
+      display: flex; justify-content: center; align-items: center;
+      will-change: top, left, transform;
+      transform-origin: center bottom; 
+    }
+
+    .car-size { width: 50px; height: 90px; }
+
+    @media (max-width: 768px) {
+      .car-size {
+        width: 13vw; 
+        height: 24vw; 
+        max-width: 60px;
+        max-height: 110px;
+      }
+      #playerCar { margin-left: -6.5vw !important; }
+    }
+
+    #playerCar {
+      left: 50%; margin-left: -25px; 
+      /* [修改] 調整玩家層級，配合動態 Z-index 確保遮擋關係正確 */
+      z-index: 3500; 
+      pointer-events: none;
+    }
+
+    @keyframes engineRumble {
+      0% { transform: translate(0, 0) rotate(0deg); }
+      25% { transform: translate(1px, 1px) rotate(0.5deg); }
+      50% { transform: translate(-1px, 0) rotate(0deg); }
+      75% { transform: translate(0, -1px) rotate(-0.5deg); }
+      100% { transform: translate(0, 0) rotate(0deg); }
+    }
+
+    .car-body {
+      width: 100%; height: 100%;
+      position: relative;
+      filter: drop-shadow(0 20px 10px rgba(0,0,0,0.6));
+      animation: engineRumble 0.1s infinite linear;
+    }
+
+    .smoke-particle {
+      position: absolute;
+      width: 12px; height: 12px;
+      background: rgba(200, 200, 200, 0.4);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 900; 
+      filter: blur(2px);
+      animation: smokeTrail 0.6s ease-out forwards;
+    }
+
+    @keyframes smokeTrail {
+      0% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+      100% { transform: translate(0, 150px) scale(4); opacity: 0; }
+    }
+
+    .word-item {
+      color: #ffffff;
+      background: linear-gradient(to bottom, #059669, #047857);
+      font-weight: 900;
+      font-family: 'Noto Sans TC', sans-serif;
+      font-size: 40px; 
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: 4px solid white;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.6);
+      text-shadow: 2px 2px 0px rgba(0,0,0,0.5);
+      white-space: nowrap;
+      text-align: center;
+    }
+    
+    .enemy-bullet {
+      width: 16px; height: 32px;
+      background: #fefce8; 
+      border-radius: 999px; 
+      border: 2px solid #facc15;
+      box-shadow: 0 0 10px #facc15, 0 0 20px #eab308;
+      animation: bulletFlash 0.1s infinite alternate;
+    }
+
+    @keyframes bulletFlash {
+      from { filter: brightness(1) drop-shadow(0 0 5px #eab308); box-shadow: 0 0 10px #facc15; }
+      to { filter: brightness(1.8) drop-shadow(0 0 15px #fef08a); box-shadow: 0 0 25px #facc15, 0 0 40px #ca8a04; }
+    }
+
+    .lane-warning {
+      position: absolute;
+      top: 35%; /* HORIZON_Y_PCT */
+      width: 40px; height: 40px;
+      margin-left: -20px; 
+      border-radius: 50%;
+      color: white;
+      font-weight: 900;
+      font-size: 24px;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200; 
+      animation: warningPulse 0.3s infinite alternate;
+      box-shadow: 0 0 15px rgba(0,0,0,0.5);
+      border: 3px solid white;
+    }
+
+    .rock-warning { background: rgba(220, 38, 38, 0.9); box-shadow: 0 0 10px #ef4444; }
+    .traffic-warning { background: rgba(234, 179, 8, 0.9); box-shadow: 0 0 10px #eab308; color: black; }
+
+    @keyframes warningPulse {
+      from { transform: scale(1); opacity: 1; }
+      to { transform: scale(1.2); opacity: 0.8; }
+    }
+
+    /* [修改] 縮小岩石尺寸，使其視覺上更和諧 */
+    .rock-obstacle {
+      width: 45px; height: 40px;
+      background: radial-gradient(circle at 40% 40%, #a8a29e, #57534e 80%);
+      border-radius: 40% 60% 30% 70% / 50% 30% 70% 50%;
+      box-shadow: 5px 10px 15px rgba(0,0,0,0.8), inset -5px -5px 10px rgba(0,0,0,0.5);
+      animation: rockTumble 1.5s linear infinite;
+    }
+    @keyframes rockTumble {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .car-img {
+      width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 2;
+    }
+
+    .fallback-rect {
+      display: none; width: 80%; height: 90%; border-radius: 16px;
+      margin: 0 auto; position: absolute; top: 5%; left: 10%; z-index: 1; border: 1px solid rgba(0,0,0,0.3);
+    }
+    
+    .boost-fire {
+      position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%);
+      width: 20px; height: 50px;
+      background: linear-gradient(to bottom, #60a5fa, transparent);
+      opacity: 0; transition: opacity 0.2s; z-index: 0; filter: blur(2px);
+    }
+    .boosting .boost-fire { opacity: 1; }
+
+    .player-hit .car-body { animation: damageFlash 0.2s ease-in-out 3; }
+    @keyframes damageFlash {
+      0%, 100% { filter: drop-shadow(0 20px 10px rgba(0,0,0,0.6)); }
+      50% { filter: sepia(1) hue-rotate(-50deg) saturate(3) drop-shadow(0 0 10px red); }
+    }
+
+    .shake-screen { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+    @keyframes shake { 
+      10%, 90% { transform: translate3d(-3px, 0, 0); }
+      20%, 80% { transform: translate3d(5px, 0, 0); }
+      30%, 50%, 70% { transform: translate3d(-7px, 0, 0); }
+      40%, 60% { transform: translate3d(7px, 0, 0); }
+    }
+
+    .anim-collect { animation: collectFly 0.5s ease-out forwards; }
+    @keyframes collectFly {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(2) translateY(-100px); opacity: 0; }
+    }
+
+    .anim-flip-crash { animation: flipOver 0.6s ease-out forwards; }
+    @keyframes flipOver {
+      0% { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 1; }
+      100% { transform: translate3d(300px, -400px, 100px) rotate(720deg) scale(0.5); opacity: 0; }
+    }
+    .anim-flip-crash-left { animation: flipOverLeft 0.6s ease-out forwards; }
+    @keyframes flipOverLeft {
+      0% { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 1; }
+      100% { transform: translate3d(-300px, -400px, 100px) rotate(-720deg) scale(0.5); opacity: 0; }
+    }
+
+    /* --- UI --- */
+    .dashboard-panel {
+      padding: 20px; background: #0a0a0a;
+      display: flex; flex-direction: column;
+      position: relative;
+      border-left: 1px solid #333;
+    }
+    .heart { font-size: 20px; color: #ef4444; margin: 0 1px; text-shadow: 0 0 5px red; }
+    .heart.lost { color: #333; text-shadow: none; }
+    
+    .question-card {
+      background: linear-gradient(135deg, #1f2937 0%, #111827 100%); 
+      border-left: 4px solid #f59e0b;
+      padding: 15px; margin-bottom: 20px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+      text-align: center;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .controls-hint {
+      display: flex; justify-content: center; gap: 10px; margin-top: 20px; flex-wrap: wrap;
+    }
+    .key-hint {
+      display: flex; justify-content: center; align-items: center;
+      padding: 8px 16px;
+      background: #262626; border-radius: 6px; border: 1px solid #404040;
+      color: #d4d4d4; font-size: 13px;
+    }
+    .icon-mouse { font-size: 20px; margin-right: 6px; }
+  </style>
+</head>
+<body>
+
+  <div class="main-grid">
+    <div class="track-panel" id="trackPanel">
+      <div class="input-layer" id="inputLayer"></div>
+      
+      <div class="scene-container">
+        <!-- 山壁 -->
+        <div class="wall side-left"></div>
+        <div class="wall side-right"></div>
+
+        <div class="road-container" id="roadContainer">
+          <div class="road" id="road"></div>
+        </div>
+      </div>
+      
+      <div id="gameEntities"></div>
+
+      <!-- Player Car -->
+      <div class="game-object car-size" id="playerCar">
+        <div class="car-body">
+          <img src="player.png" class="car-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+          <div class="fallback-rect bg-red-600 shadow-lg" style="display:none"></div>
+          <div class="boost-fire"></div>
+        </div>
+        <div class="absolute -bottom-8 text-[12px] font-bold text-yellow-400 tracking-wider bg-black bg-opacity-70 px-2 rounded backdrop-blur-sm border border-yellow-600">YOU</div>
+      </div>
+    </div>
+
+    <div class="dashboard-panel">
+      <div class="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
+        <div>
+          <h1 class="text-xl md:text-2xl text-white game-font italic transform -skew-x-12 tracking-tighter" style="text-shadow: 0 0 10px rgba(255,255,255,0.3);">
+            TOUGE<br><span class="text-yellow-500">DRIFT</span>
+          </h1>
+        </div>
+        <div class="text-right">
+          <div id="healthBar" class="mb-1 flex justify-end"></div>
+          <div class="text-[10px] text-gray-500 uppercase tracking-widest font-bold">SCORE</div>
+          <div class="text-xl font-mono text-blue-400" id="scoreDisplay">0</div>
+        </div>
+      </div>
+
+      <div class="flex-grow relative">
+        <div id="startScreen" class="absolute inset-0 z-20 flex flex-col items-center justify-center text-center">
+          <div class="text-6xl mb-6 filter drop-shadow-lg">🏔️🏎️</div>
+          <h2 class="text-2xl font-bold mb-3 text-white tracking-wide">山道競速單字戰</h2>
+          <p class="text-gray-400 text-xs mb-8 px-4 leading-relaxed">
+            <span class="text-white font-bold">滑鼠 / 觸控</span> 控制轉向<br>
+            收集 <span class="text-green-400 font-bold border border-green-800 px-1 rounded bg-green-900 bg-opacity-30">正確翻譯路牌</span><br>
+            閃避 <span class="text-red-400 font-bold">對向來車</span> 與 <span class="text-yellow-400 font-bold">敵方子彈</span><br>
+            小心 <span class="text-gray-400 font-bold">巨大落石</span>
+          </p>
+          <button onclick="startGame()" class="game-font w-full bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white text-lg py-4 rounded-sm shadow-xl transform transition hover:translate-y-[-2px] tracking-widest border-b-4 border-red-900">
+            ENGINE START
+          </button>
+        </div>
+
+        <div id="resultScreen" class="hidden absolute inset-0 z-20 flex flex-col items-center justify-center text-center bg-black bg-opacity-90 rounded-xl backdrop-blur-sm">
+          <div class="text-6xl mb-4 animate-pulse" id="resultEmoji">💥</div>
+          <h2 class="text-3xl font-bold mb-2 text-white game-font italic" id="resultTitle">GAME OVER</h2>
+          <p class="text-gray-400 mb-8 text-sm" id="resultDesc">...</p>
+          <button onclick="startGame()" class="w-full bg-white text-black font-bold py-3 rounded-sm shadow-lg hover:bg-gray-200 transition">
+            RESTART
+          </button>
+        </div>
+
+        <div id="questionArea" class="hidden flex flex-col h-full items-center pt-2 md:pt-4">
+          <div class="text-gray-500 text-[10px] uppercase mb-1 font-bold tracking-widest md:block hidden">MISSION TARGET</div>
+          <div class="question-card w-full transform transition hover:scale-[1.02]">
+            <h2 id="qText" class="text-2xl md:text-4xl font-bold text-white leading-tight">...</h2>
+          </div>
+          
+          <div id="feedback" class="h-8 mt-2 text-center font-bold text-sm tracking-wider"></div>
+
+          <div class="controls-hint">
+            <div class="key-hint"><span class="icon-mouse">🖱️</span> MOUSE</div>
+            <div class="key-hint"><span class="icon-mouse">👆</span> TOUCH</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-auto pt-4">
+        <div class="flex justify-between text-[10px] text-gray-500 mb-1 font-mono">
+          <span>DISTANCE</span>
+          <span id="progressText">0%</span>
+        </div>
+        <div class="w-full bg-gray-900 h-1 rounded-full overflow-hidden border border-gray-800">
+          <div id="progressBar" class="bg-yellow-500 h-full w-0 transition-all duration-300 shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 題目資料
+    const questionsData = [
+      { zh: "收銀員", en: "cashier" }, { zh: "顧客", en: "customer" },
+      { zh: "收據", en: "receipt" }, { zh: "標價", en: "price tag" },
+      { zh: "現金", en: "cash" }, { zh: "零錢", en: "change" },
+      { zh: "更衣室", en: "fitting room" }, { zh: "包裝禮物", en: "gift wrap" },
+      { zh: "回家", en: "get home" }, { zh: "起床", en: "get up" },
+      { zh: "熬夜", en: "stay up " }, { zh: "吃早午餐", en: "have brunch" },
+      { zh: "泡澡", en: "take a bath" }, { zh: "淋浴", en: "take a shower" },
+      { zh: "開始上課", en: "start class" }, { zh: "時間管理", en: "time management" },
+      { zh: "關係", en: "relationship" }, { zh: "去玩", en: "hang out" },
+      { zh: "宿舍", en: "dorm" }, { zh: "寄簡訊", en: "text message" },
+      { zh: "玩手機遊戲", en: "play mobile games" }, { zh: "用網路銀行", en: "do online banking" },
+      { zh: "刷社交平台", en: "check social media" }, { zh: "網路購物", en: "shop online" }
+    ];
+    
+    const allWords = questionsData.map(q => q.en);
+    const MAX_LIVES = 3;
+    const TRAFFIC_LATERAL_SPEED = 0.2;
+    const BULLET_SPEED = 12;
+    const ROCK_SPEED = 7;
+    const HORIZON_Y_PCT = 35; 
+    
+    // 遊戲邊界
+    const BOUNDS_X_MIN = 10;
+    const BOUNDS_X_MAX = 90;
+    const BOUNDS_Y_MIN = 5;
+    const BOUNDS_Y_MAX = 80;
+
+    const LANES = [20, 50, 80];
+
+    const CAR_IMAGES = ['play1.png', 'play2.png', 'play3.png', 'play4.png', 'play5.png'];
+    const FALLBACK_COLORS = ['bg-gray-500', 'bg-slate-600', 'bg-zinc-500', 'bg-blue-800', 'bg-red-800'];
+
+    let gameState = {
+      queue: [],
+      currentIdx: 0,
+      score: 0,
+      mistakes: 0,
+      isRunning: false,
+      gameLoop: null,
+      spawnerLoop: null,
+      playerX: 50, 
+      playerY: 10,
+      lastHitTime: 0,
+      lastPlayerX: 50,
+      currentTilt: 0,
+    };
+
+    let keys = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ArrowDown: false };
+    
+    let lastRockTime = 0;
+
+    const ui = {
+      startScreen: document.getElementById('startScreen'),
+      questionArea: document.getElementById('questionArea'),
+      resultScreen: document.getElementById('resultScreen'),
+      qText: document.getElementById('qText'),
+      feedback: document.getElementById('feedback'),
+      scoreDisplay: document.getElementById('scoreDisplay'),
+      progressBar: document.getElementById('progressBar'),
+      progressText: document.getElementById('progressText'),
+      healthBar: document.getElementById('healthBar'),
+      resultTitle: document.getElementById('resultTitle'),
+      resultDesc: document.getElementById('resultDesc'),
+      resultEmoji: document.getElementById('resultEmoji'),
+      
+      trackPanel: document.getElementById('trackPanel'),
+      playerCar: document.getElementById('playerCar'),
+      gameEntities: document.getElementById('gameEntities'),
+      inputLayer: document.getElementById('inputLayer')
+    };
+
+    function shuffle(arr) { return arr.sort(() => Math.random() - 0.5); }
+
+    /* --- 操控輸入處理 --- */
+    window.addEventListener('mousemove', (e) => {
+      if (!gameState.isRunning) return;
+      handleInputMove(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!gameState.isRunning) return;
+      const touch = e.touches[0];
+      handleInputMove(touch.clientX, touch.clientY);
+    }, {passive: false});
+
+    window.addEventListener('touchstart', (e) => {
+       if (gameState.isRunning && e.target.closest('.track-panel')) {
+           // e.preventDefault();
+       }
+    }, {passive: false});
+
+    function handleInputMove(clientX, clientY) {
+      const rect = ui.trackPanel.getBoundingClientRect();
+      
+      let rawX = (clientX - rect.left) / rect.width * 100;
+      let rawY = (1 - (clientY - rect.top) / rect.height) * 100;
+
+      let targetX = Math.max(BOUNDS_X_MIN, Math.min(rawX, BOUNDS_X_MAX));
+      let targetY = Math.max(BOUNDS_Y_MIN, Math.min(rawY, BOUNDS_Y_MAX));
+
+      gameState.playerX = targetX;
+      gameState.playerY = targetY;
+      
+      ui.playerCar.style.left = gameState.playerX + '%';
+      ui.playerCar.style.bottom = gameState.playerY + '%';
+    }
+
+    const KEY_SPEED_X = 2.0;
+    const KEY_SPEED_Y = 1.5;
+    
+    document.addEventListener('keydown', (e) => {
+      if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
+    });
+    document.addEventListener('keyup', (e) => {
+      if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
+    });
+
+    // --- 遊戲流程 ---
+    function startGame() {
+      gameState.queue = shuffle([...questionsData]);
+      gameState.currentIdx = 0;
+      gameState.score = 0;
+      gameState.mistakes = 0;
+      gameState.isRunning = true;
+      gameState.playerX = 50;
+      gameState.playerY = 10;
+      gameState.lastPlayerX = 50;
+      gameState.currentTilt = 0;
+      gameState.lastHitTime = 0;
+      lastRockTime = 0;
+
+      ui.scoreDisplay.innerText = "0";
+      ui.progressBar.style.width = "0%";
+      ui.progressText.innerText = "0%";
+      updateHearts();
+      
+      ui.startScreen.classList.add('hidden');
+      ui.resultScreen.classList.add('hidden');
+      ui.questionArea.classList.remove('hidden');
+      ui.trackPanel.style.cursor = 'none';
+
+      ui.gameEntities.innerHTML = "";
+      ui.playerCar.classList.remove('player-hit');
+      ui.playerCar.style.left = '50%';
+      ui.playerCar.style.bottom = '10%';
+      
+      if (gameState.gameLoop) cancelAnimationFrame(gameState.gameLoop);
+      if (gameState.spawnerLoop) clearInterval(gameState.spawnerLoop);
+
+      gameState.spawnerLoop = setInterval(spawnManager, 1000); 
+      gameState.gameLoop = requestAnimationFrame(updateGame);
+
+      showNextQuestion();
+    }
+
+    function updateHearts() {
+      ui.healthBar.innerHTML = "";
+      const remaining = MAX_LIVES - gameState.mistakes;
+      for (let i = 0; i < MAX_LIVES; i++) {
+        const span = document.createElement('span');
+        span.className = `heart ${i < remaining ? '' : 'lost'}`;
+        span.innerText = i < remaining ? '❤️' : '💀'; 
+        ui.healthBar.appendChild(span);
+      }
+    }
+
+    function showNextQuestion() {
+      if (gameState.currentIdx >= gameState.queue.length) {
+        endGame(true);
+        return;
+      }
+      const q = gameState.queue[gameState.currentIdx];
+      ui.qText.innerText = q.zh;
+      ui.feedback.innerText = "";
+      
+      const pct = Math.round((gameState.currentIdx / gameState.queue.length) * 100);
+      ui.progressBar.style.width = `${pct}%`;
+      ui.progressText.innerText = `${pct}%`;
+    }
+
+    // --- 遊戲主迴圈 ---
+    function updateGame() {
+      if (!gameState.isRunning) return;
+
+      if (keys.ArrowLeft) gameState.playerX -= KEY_SPEED_X;
+      if (keys.ArrowRight) gameState.playerX += KEY_SPEED_X;
+      if (keys.ArrowUp) gameState.playerY += KEY_SPEED_Y;
+      if (keys.ArrowDown) gameState.playerY -= KEY_SPEED_Y;
+
+      if (gameState.playerX < BOUNDS_X_MIN) gameState.playerX = BOUNDS_X_MIN;
+      if (gameState.playerX > BOUNDS_X_MAX) gameState.playerX = BOUNDS_X_MAX;
+      if (gameState.playerY < BOUNDS_Y_MIN) gameState.playerY = BOUNDS_Y_MIN;
+      if (gameState.playerY > BOUNDS_Y_MAX) gameState.playerY = BOUNDS_Y_MAX;
+
+      ui.playerCar.style.left = gameState.playerX + '%';
+      ui.playerCar.style.bottom = gameState.playerY + '%';
+
+      // 計算移動量
+      const deltaX = gameState.playerX - gameState.lastPlayerX;
+      
+      // 增加傾斜感
+      let targetTilt = deltaX * 4.0; 
+      if (targetTilt > 35) targetTilt = 35;
+      if (targetTilt < -35) targetTilt = -35;
+      
+      gameState.currentTilt += (targetTilt - gameState.currentTilt) * 0.2;
+      
+      const suspensionComp = Math.abs(gameState.currentTilt) * 0.3;
+      ui.playerCar.style.transform = `rotate(${gameState.currentTilt}deg) translateY(${suspensionComp}px)`;
+      
+      if (Math.abs(deltaX) > 0.5) {
+        spawnSmoke(gameState.playerX, gameState.playerY);
+      }
+
+      gameState.lastPlayerX = gameState.playerX;
+
+      updateEntities();
+
+      gameState.gameLoop = requestAnimationFrame(updateGame);
+    }
+
+    function spawnSmoke(xPct, yPct) {
+      if (Math.random() > 0.3) return; 
+
+      const carEl = ui.playerCar;
+      const trackEl = ui.trackPanel;
+      
+      const carRect = carEl.getBoundingClientRect();
+      const trackRect = trackEl.getBoundingClientRect();
+      
+      createSmokeParticle(carRect.left + 8 - trackRect.left, carRect.bottom - 10 - trackRect.top);
+      createSmokeParticle(carRect.right - 12 - trackRect.left, carRect.bottom - 10 - trackRect.top);
+    }
+
+    function createSmokeParticle(left, top) {
+      const smoke = document.createElement('div');
+      smoke.className = 'smoke-particle';
+      smoke.style.left = left + 'px';
+      smoke.style.top = top + 'px';
+      
+      ui.trackPanel.appendChild(smoke);
+      
+      setTimeout(() => {
+        smoke.remove();
+      }, 600);
+    }
+
+    // 更新所有實體的位置與縮放
+    function updateEntities() {
+      const entities = document.querySelectorAll('.game-object:not(#playerCar)');
+      const playerRect = ui.playerCar.getBoundingClientRect();
+      const pRect = {
+        left: playerRect.left + 8, 
+        right: playerRect.right - 8,
+        top: playerRect.top + 8,
+        bottom: playerRect.bottom - 8
+      };
+
+      const horizonY = window.innerHeight * (HORIZON_Y_PCT / 100);
+      const totalDist = window.innerHeight - horizonY;
+
+      entities.forEach(el => {
+        // [修改] 如果是警告標誌，不需要移動
+        if (el.dataset.type === 'warning') return;
+
+        let top = parseFloat(el.dataset.top || -150);
+        let speed = parseFloat(el.dataset.speed || 0.5);
+        
+        let progress = (top - horizonY) / totalDist;
+        
+        let speedMultiplier = 0.1 + Math.pow(progress, 1.5) * 2.5; 
+        let currentSpeed = speed * speedMultiplier; 
+
+        // --- 敵車 AI 移動 ---
+        if (el.dataset.type === 'car') {
+            let currentLeft = parseFloat(el.style.left);
+            
+            if (progress > 0.5) {
+                const diff = gameState.playerX - currentLeft;
+                if (Math.abs(diff) < 15) { 
+                    if (diff > 0) currentLeft -= TRAFFIC_LATERAL_SPEED * 0.5; 
+                    else currentLeft += TRAFFIC_LATERAL_SPEED * 0.5;
+                }
+            }
+            if (currentLeft < 15) currentLeft = 15;
+            if (currentLeft > 85) currentLeft = 85;
+            el.style.left = currentLeft + '%';
+
+            if (Math.random() < 0.015) { 
+                spawnEnemyBullet(el, top, currentLeft);
+            }
+        }
+
+        top += currentSpeed;
+        el.dataset.top = top;
+        el.style.top = top + 'px';
+
+        // --- 關鍵修改：透視縮放與層級 ---
+        // [修改] 調整縮放係數 (1.25)，使敵車接近玩家(progress約0.8)時大小精確為1.0，視覺更和諧
+        let scale = 0.1 + (progress * 1.25); 
+        
+        if (el.dataset.type === 'word') {
+             scale = 0.2 + (progress * 1.2); 
+        }
+
+        if (scale < 0) scale = 0;
+        
+        el.style.transform = `scale(${scale})`;
+        
+        el.style.opacity = progress < 0.15 ? (progress / 0.15) : 1;
+
+        // [修改] 大幅增加 Z-index 範圍，讓敵車可以正確遮擋或被遮擋
+        el.style.zIndex = Math.floor(progress * 5000);
+
+        if (top > window.innerHeight) {
+          el.remove();
+          return;
+        }
+
+        if (el.dataset.hit === 'true') return;
+
+        const eRect = el.getBoundingClientRect();
+        const hitMargin = 15 * scale; 
+        
+        if (
+          pRect.left < eRect.right - hitMargin &&
+          pRect.right > eRect.left + hitMargin &&
+          pRect.top < eRect.bottom - hitMargin &&
+          pRect.bottom > eRect.top + hitMargin
+        ) {
+          handleCollision(el);
+        }
+      });
+    }
+
+    function spawnEnemyBullet(sourceEl, top, leftPct) {
+        if (sourceEl.dataset.attackCooldown && parseInt(sourceEl.dataset.attackCooldown) > 0) {
+            sourceEl.dataset.attackCooldown = parseInt(sourceEl.dataset.attackCooldown) - 1;
+            return;
+        }
+        sourceEl.dataset.attackCooldown = 50;
+
+        const bullet = document.createElement('div');
+        bullet.className = "game-object enemy-bullet";
+        bullet.dataset.type = "enemy_bullet";
+        bullet.dataset.speed = BULLET_SPEED;
+        bullet.style.left = leftPct + '%';
+        bullet.dataset.top = top + 40; 
+        bullet.style.top = (top + 40) + 'px';
+        
+        bullet.style.transform = "scale(0)";
+        bullet.style.opacity = "0";
+        
+        ui.gameEntities.appendChild(bullet);
+    }
+
+    function spawnRock() {
+        const lane = LANES[Math.floor(Math.random() * LANES.length)];
+        const horizonY = window.innerHeight * (HORIZON_Y_PCT / 100);
+        
+        // 1. 生成預警標示 (納入 game-object 系統以便 isLaneFree 檢測)
+        const warning = document.createElement('div');
+        warning.className = 'game-object lane-warning rock-warning';
+        warning.innerHTML = '!';
+        warning.style.left = lane + '%';
+        warning.dataset.top = horizonY; // 設定虛擬高度供檢測
+        warning.dataset.type = 'warning';
+        ui.gameEntities.appendChild(warning);
+
+        // 2. 延遲 1 秒後生成真正的落石
+        setTimeout(() => {
+            warning.remove();
+            if (!gameState.isRunning) return;
+
+            const rock = document.createElement('div');
+            rock.className = "game-object rock-obstacle";
+            rock.dataset.type = "rock";
+            rock.dataset.speed = ROCK_SPEED;
+            rock.style.left = lane + '%';
+
+            rock.dataset.top = horizonY;
+            rock.style.top = horizonY + 'px';
+
+            rock.style.transform = "scale(0)";
+            rock.style.opacity = "0";
+
+            ui.gameEntities.appendChild(rock);
+        }, 1000);
+    }
+
+    function handleCollision(el) {
+      if (el.dataset.type === 'warning') return; // 忽略警告標示的碰撞
+      
+      el.dataset.hit = "true";
+      const type = el.dataset.type;
+
+      if (type === 'car') {
+        takeDamage("CRASH! 車禍 💥");
+        el.classList.add(Math.random() > 0.5 ? 'anim-flip-crash' : 'anim-flip-crash-left');
+      } else if (type === 'enemy_bullet') {
+        takeDamage("SHOT! 中彈了 🔫");
+        el.remove(); 
+      } else if (type === 'rock') {
+        takeDamage("SMASH! 撞擊落石 🪨");
+        el.remove();
+      } else if (type === 'word') {
+        const word = el.innerText;
+        const correctWord = gameState.queue[gameState.currentIdx].en;
+        
+        if (word === correctWord) {
+          gameState.score += 100;
+          ui.scoreDisplay.innerText = gameState.score;
+          ui.feedback.innerHTML = `<span class="text-green-400 drop-shadow-md text-lg">PERFECT DRIFT! 🎉</span>`;
+          ui.playerCar.classList.add('boosting');
+          
+          el.classList.add('anim-collect');
+          setTimeout(() => el.remove(), 500);
+          setTimeout(() => ui.playerCar.classList.remove('boosting'), 500);
+
+          gameState.currentIdx++;
+          document.querySelectorAll('[data-type="word"]').forEach(w => {
+             if(w !== el) w.animate([{opacity:1}, {opacity:0}], {duration:200}).onfinish = () => w.remove();
+          });
+          
+          setTimeout(showNextQuestion, 800);
+
+        } else {
+          takeDamage(`WRONG! 選錯字了 ❌`);
+          el.animate([{transform: `scale(${el.getBoundingClientRect().width/100}) rotate(360deg)`, opacity: 0}], {duration: 500}).onfinish = () => el.remove();
+        }
+      }
+    }
+
+    function takeDamage(msg) {
+      const now = Date.now();
+      if (now - gameState.lastHitTime < 1000) return;
+      gameState.lastHitTime = now;
+
+      gameState.mistakes++;
+      updateHearts();
+      ui.feedback.innerHTML = `<span class="text-red-500 font-bold">${msg}</span>`;
+      
+      ui.playerCar.classList.add('player-hit');
+      ui.trackPanel.classList.add('shake-screen');
+
+      setTimeout(() => {
+        ui.trackPanel.classList.remove('shake-screen');
+        ui.playerCar.classList.remove('player-hit');
+      }, 500);
+
+      if (gameState.mistakes >= MAX_LIVES) {
+        setTimeout(() => endGame(false), 800);
+      }
+    }
+
+    function isLaneFree(lanePos) {
+      // 包含 warning 類型
+      const entities = document.querySelectorAll('.game-object:not(#playerCar)');
+      const horizonY = window.innerHeight * (HORIZON_Y_PCT / 100);
+      
+      for (let el of entities) {
+        const elLeft = parseFloat(el.style.left); 
+        const elTop = parseFloat(el.dataset.top || -150);
+        
+        // 擴大偵測範圍，確保警告期間也不會重疊
+        if (elTop < horizonY + 150) { 
+             if (Math.abs(elLeft - lanePos) < 15) return false;
+        }
+      }
+      return true;
+    }
+
+    function spawnManager() {
+      if (!gameState.isRunning) return;
+      if (gameState.currentIdx >= gameState.queue.length) return;
+
+      const now = Date.now();
+      if (Math.random() < 0.2 && now - lastRockTime > 2000) {
+          spawnRock();
+          lastRockTime = now;
+      }
+
+      const activeWords = document.querySelectorAll('.game-object[data-type="word"]');
+      const correctWord = gameState.queue[gameState.currentIdx].en;
+      const hasCorrect = Array.from(activeWords).some(el => el.dataset.word === correctWord);
+
+      let desiredType = 'traffic';
+      
+      if (activeWords.length < 2) {
+          if (!hasCorrect) {
+              desiredType = Math.random() < 0.8 ? 'word_correct' : 'traffic';
+          } else {
+              desiredType = Math.random() < 0.6 ? 'word_wrong' : 'traffic';
+          }
+      } else {
+          desiredType = 'traffic';
+      }
+
+      const shuffledLanes = shuffle([...LANES]);
+      for (let lane of shuffledLanes) {
+          if (isLaneFree(lane)) {
+              if (desiredType === 'traffic') {
+                  spawnTraffic(lane);
+              } else if (desiredType === 'word_correct') {
+                  spawnWord(correctWord, lane);
+              } else if (desiredType === 'word_wrong') {
+                  const wrong = shuffle(allWords.filter(w => w !== correctWord))[0];
+                  spawnWord(wrong, lane);
+              }
+              return; 
+          }
+      }
+    }
+
+    function spawnTraffic(lane) {
+      const horizonY = window.innerHeight * (HORIZON_Y_PCT / 100);
+
+      // [新增] 敵車預警
+      const warning = document.createElement('div');
+      warning.className = 'game-object lane-warning traffic-warning';
+      warning.innerHTML = '⚠️';
+      warning.style.left = lane + '%';
+      warning.dataset.top = horizonY; 
+      warning.dataset.type = 'warning';
+      ui.gameEntities.appendChild(warning);
+
+      setTimeout(() => {
+        warning.remove();
+        if (!gameState.isRunning) return;
+
+        const el = document.createElement('div');
+        // 確保使用相同的 car-size
+        el.className = "game-object traffic-car car-size";
+        el.dataset.type = "car";
+        el.dataset.speed = 6 + Math.random() * 3; 
+        
+        el.style.left = lane + '%';
+        
+        el.dataset.top = horizonY;
+        el.style.top = horizonY + 'px';
+        
+        el.style.transform = "scale(0)";
+        el.style.opacity = "0";
+
+        const imgName = CAR_IMAGES[Math.floor(Math.random() * CAR_IMAGES.length)];
+        const fallbackColor = FALLBACK_COLORS[Math.floor(Math.random() * FALLBACK_COLORS.length)];
+
+        el.innerHTML = `
+          <div class="car-body">
+            <img src="${imgName}" class="car-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div class="fallback-rect ${fallbackColor} rounded-md shadow-lg border border-gray-400"></div>
+          </div>
+        `;
+        ui.gameEntities.appendChild(el);
+      }, 800); // 0.8秒預警
+    }
+
+    function spawnWord(text, lane) {
+      const el = document.createElement('div');
+      el.className = "game-object word-item";
+      el.dataset.type = "word";
+      el.dataset.word = text;
+      el.innerText = text;
+      el.dataset.speed = 5; 
+      
+      el.style.left = lane + '%';
+      
+      const horizonY = window.innerHeight * (HORIZON_Y_PCT / 100);
+      el.dataset.top = horizonY;
+      el.style.top = horizonY + 'px';
+      
+      el.style.transform = "scale(0)";
+      el.style.opacity = "0";
+
+      ui.gameEntities.appendChild(el);
+    }
+
+    function endGame(isWin) {
+      gameState.isRunning = false;
+      clearInterval(gameState.spawnerLoop);
+      cancelAnimationFrame(gameState.gameLoop);
+      
+      ui.trackPanel.style.cursor = 'default'; 
+      ui.questionArea.classList.add('hidden');
+      ui.resultScreen.classList.remove('hidden');
+      ui.gameEntities.innerHTML = "";
+      ui.playerCar.classList.remove('player-hit');
+
+      if (isWin) {
+        ui.resultEmoji.innerText = "🏁";
+        ui.resultTitle.innerText = "COURSE CLEAR";
+        ui.resultTitle.className = "text-4xl font-bold mb-2 text-yellow-400 game-font italic";
+        ui.resultDesc.innerText = `制霸山道！最終分數：${gameState.score}`;
+        ui.progressBar.style.width = "100%";
+      } else {
+        ui.resultEmoji.innerText = "🚔";
+        ui.resultTitle.innerText = "DNF";
+        ui.resultTitle.className = "text-4xl font-bold mb-2 text-red-600 game-font italic";
+        ui.resultDesc.innerText = `車輛損毀，挑戰失敗。`;
+      }
+    }
+  </script>
+</body>
+</html>
